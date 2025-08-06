@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Certificate Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inconsolata&family=Lato&family=Lobster&family=Merriweather&family=Montserrat&family=Open+Sans&family=Oswald&family=Playfair+Display&family=Raleway&family=Roboto&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .tab-active {
+            border-color: #4f46e5;
+            color: #4f46e5;
+            background-color: #eef2ff;
+        }
+        .canvas-container {
+            position: relative;
+            border: 2px dashed #cbd5e1;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+        .placeholder-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #64748b;
+            text-align: center;
+        }
+        .drawing-rect {
+            position: absolute;
+            border: 2px solid #ef4444;
+            background-color: rgba(239, 68, 68, 0.2);
+            pointer-events: none;
+        }
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 50; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 15% auto; /* 15% from the top and centered */
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%; /* Could be more or less, depending on screen size */
+            max-width: 500px;
+            border-radius: 0.5rem;
+        }
+        input[type="color"] {
+            appearance: none;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: 1px solid #cbd5e1;
+            border-radius: 50%;
+        }
+        body {
+    font-family: 'Inter', sans-serif;
+    background-color: #f8fafc; /* lighter subtle bg for less harsh white */
+    color: #334155; /* softer dark slate */
+}
+
+h1, h2, h3, h4 {
+    font-weight: 600;
+}
+
+h1 {
+    letter-spacing: 0.03em;
+}
+
+a {
+    transition: color 0.2s ease;
+}
+
+a:hover, a:focus {
+    color: #4338ca; /* Indigo-700 for a smoother hover */
+    outline: none;
+    text-decoration: underline;
+}
+
+input[type="text"],
+input[type="color"],
+select {
+    transition: box-shadow 0.2s ease;
+}
+
+input[type="text"]:focus,
+select:focus {
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.3); /* Indigo-500 shadow */
+}
+
+button {
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+}
+
+button:hover {
+    box-shadow: 0 4px 6px rgb(0 0 0 / 0.1);
+}
+
+button:focus-visible {
+    outline: 2px solid #4f46e5;
+    outline-offset: 2px;
+}
+
+.canvas-container {
+    background-color: #ffffff;
+    box-shadow: 0 4px 8px rgb(100 116 139 / 0.1);
+}
+
+.placeholder-text {
+    font-style: italic;
+    font-weight: 500;
+    color: #94a3b8; /* text-slate-400 */
+}
+
+.drawing-rect {
+    border-radius: 0.25rem;
+}
+
+.modal-content {
+    box-shadow: 0 10px 25px rgb(0 0 0 / 0.15);
+}
+
+#bulk-loader {
+    border-color: transparent;
+    border-top-color: #4f46e5;
+}
+
+.text-slate-400 {
+    letter-spacing: 0.015em;
+}
+
+.text-slate-500, .text-slate-600 {
+    line-height: 1.4;
+}
+
+#verify-result > div {
+    box-shadow: 0 1px 3px rgb(0 0 0 / 0.05);
+    padding: 12px;
+}
+
+#bulk-results-grid > div:hover {
+    transform: translateY(-3px);
+    transition: transform 0.2s ease;
+    box-shadow: 0 10px 15px rgb(0 0 0 / 0.1);
+}
+
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800">
+
+    <div class="container mx-auto p-4 md:p-8">
+        <header class="text-center mb-8">
+            <h1 class="text-4xl font-bold text-indigo-600">Certificate Generator</h1>
+            <p class="text-slate-500 mt-2">Create, bulk generate, and verify certificates with ease.</p>
+        </header>
+
+        <!-- Tabs -->
+        <div class="mb-8 border-b border-slate-200">
+            <nav class="flex -mb-px space-x-6" aria-label="Tabs">
+                <button id="tab-single" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm tab-active">Single Certificate</button>
+                <button id="tab-bulk" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-slate-500 hover:text-slate-700 hover:border-slate-300">Bulk Create</button>
+                <button id="tab-verify" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm text-slate-500 hover:text-slate-700 hover:border-slate-300">Verify Certificate</button>
+            </nav>
+        </div>
+
+        <!-- Main Content -->
+        <main>
+            <!-- Single Certificate Panel -->
+            <div id="panel-single">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Controls -->
+                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                        <h2 class="text-2xl font-semibold mb-4">1. Enter Details & Styles</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="name-input" class="block text-sm font-medium text-slate-700">Recipient's Name</label>
+                                <input type="text" id="name-input" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="e.g., Jane Doe">
+                            </div>
+                            <div>
+                                <label for="preset-input-single" class="block text-sm font-medium text-slate-700">Certificate Preset (Image)</label>
+                                <input type="file" id="preset-input-single" accept="image/*" class="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label for="name-font-select-single" class="block text-sm font-medium text-slate-700 mb-1">Name Font</label>
+                                    <select id="name-font-select-single" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></select>
+                                </div>
+                                <div>
+                                    <label for="code-font-select-single" class="block text-sm font-medium text-slate-700 mb-1">Code Font</label>
+                                    <select id="code-font-select-single" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></select>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <label for="name-color-input-single" class="block text-sm font-medium text-slate-700">Name Text Color</label>
+                                <input type="color" id="name-color-input-single" value="#000000">
+                            </div>
+                             <div class="flex items-center justify-between">
+                                <label for="code-color-input-single" class="block text-sm font-medium text-slate-700">Code Text Color</label>
+                                <input type="color" id="code-color-input-single" value="#000000">
+                            </div>
+                        </div>
+
+                        <h2 class="text-2xl font-semibold mb-2 mt-6">2. Define Areas</h2>
+                        <p class="text-sm text-slate-500 mb-4">Click and drag on the preset image to define where the name and unique code should be placed.</p>
+                        <div class="flex space-x-4 mb-4">
+                            <button id="set-name-rect-btn" class="w-full bg-sky-500 text-white px-4 py-2 rounded-md hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">Set Name Area</button>
+                            <button id="set-code-rect-btn" class="w-full bg-rose-500 text-white px-4 py-2 rounded-md hover:bg-rose-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500">Set Code Area</button>
+                        </div>
+                        <div id="rect-info" class="text-xs text-slate-400 h-8"></div>
+
+
+                        <h2 class="text-2xl font-semibold mb-4 mt-6">3. Generate</h2>
+                        <button id="create-btn-single" class="w-full bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-slate-400" disabled>
+                            Create & Download PNG
+                        </button>
+                    </div>
+
+                    <!-- Canvas -->
+                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                        <h3 class="text-lg font-medium mb-2">Live Preview</h3>
+                        <div id="canvas-container-single" class="canvas-container">
+                            <canvas id="canvas-single"></canvas>
+                            <div class="placeholder-text">Upload a preset image to begin</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bulk Create Panel -->
+            <div id="panel-bulk" class="hidden">
+                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                    <!-- Controls -->
+                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                        <h2 class="text-2xl font-semibold mb-4">1. Upload Files & Set Styles</h2>
+                        <div class="space-y-4">
+                            <div>
+                                <label for="excel-input" class="block text-sm font-medium text-slate-700">Names File (.xlsx)</label>
+                                <input type="file" id="excel-input" accept=".xlsx" class="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                                <p class="text-xs text-slate-500 mt-1">Excel file must have a column named 'Name'. <a href="data:text/plain;charset=utf-8,Name%0AJohn%20Doe%0AAlice%20Smith" download="template.csv" class="text-indigo-600 hover:underline">Download template</a>.</p>
+                            </div>
+                            <div>
+                                <label for="preset-input-bulk" class="block text-sm font-medium text-slate-700">Certificate Preset (Image)</label>
+                                <input type="file" id="preset-input-bulk" accept="image/*" class="mt-1 block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
+                            </div>
+                             <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label for="name-font-select-bulk" class="block text-sm font-medium text-slate-700 mb-1">Name Font</label>
+                                    <select id="name-font-select-bulk" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></select>
+                                </div>
+                                <div>
+                                    <label for="code-font-select-bulk" class="block text-sm font-medium text-slate-700 mb-1">Code Font</label>
+                                    <select id="code-font-select-bulk" class="mt-1 block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"></select>
+                                </div>
+                            </div>
+                             <div class="flex items-center justify-between">
+                                <label for="name-color-input-bulk" class="block text-sm font-medium text-slate-700">Name Text Color</label>
+                                <input type="color" id="name-color-input-bulk" value="#000000">
+                            </div>
+                             <div class="flex items-center justify-between">
+                                <label for="code-color-input-bulk" class="block text-sm font-medium text-slate-700">Code Text Color</label>
+                                <input type="color" id="code-color-input-bulk" value="#000000">
+                            </div>
+                        </div>
+
+                        <h2 class="text-2xl font-semibold mb-2 mt-6">2. Define Areas</h2>
+                        <p class="text-sm text-slate-500 mb-4">Click and drag on the preset to define placement areas.</p>
+                         <div class="flex space-x-4 mb-4">
+                            <button id="set-name-rect-btn-bulk" class="w-full bg-sky-500 text-white px-4 py-2 rounded-md hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-sky-500">Set Name Area</button>
+                            <button id="set-code-rect-btn-bulk" class="w-full bg-rose-500 text-white px-4 py-2 rounded-md hover:bg-rose-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-rose-500">Set Code Area</button>
+                        </div>
+                        <div id="rect-info-bulk" class="text-xs text-slate-400 h-8"></div>
+
+
+                        <h2 class="text-2xl font-semibold mb-4 mt-6">3. Generate</h2>
+                        <button id="create-btn-bulk" class="w-full bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-slate-400" disabled>
+                            Generate Certificates
+                        </button>
+                    </div>
+
+                    <!-- Canvas -->
+                    <div class="bg-white p-6 rounded-lg shadow-sm">
+                        <h3 class="text-lg font-medium mb-2">Preset Preview</h3>
+                        <div id="canvas-container-bulk" class="canvas-container">
+                            <canvas id="canvas-bulk"></canvas>
+                             <div class="placeholder-text">Upload a preset image to begin</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Bulk Results -->
+                <div id="bulk-results-container" class="mt-8 hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-2xl font-semibold">Generated Certificates</h2>
+                        <div class="flex space-x-2">
+                             <button id="download-all-pdf" class="bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">Download All as PDF</button>
+                             <div id="bulk-loader" class="hidden animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                        </div>
+                    </div>
+                    <div id="bulk-results-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                        <!-- Generated certificates will be appended here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Verify Certificate Panel -->
+            <div id="panel-verify" class="hidden">
+                <div class="max-w-md mx-auto bg-white p-8 rounded-lg shadow-sm">
+                    <h2 class="text-2xl font-semibold mb-4 text-center">Verify Certificate</h2>
+                    <div class="flex space-x-2">
+                        <input type="text" id="verify-code-input" class="flex-grow block w-full px-3 py-2 bg-white border border-slate-300 rounded-md shadow-sm placeholder-slate-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Enter 7-character unique code">
+                        <button id="verify-btn" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700">Verify</button>
+                    </div>
+                    <div id="verify-result" class="mt-6">
+                        <!-- Verification result will be shown here -->
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modal for messages -->
+    <div id="message-modal" class="modal">
+      <div class="modal-content text-center">
+        <p id="modal-text" class="text-lg mb-4"></p>
+        <button id="modal-close-btn" class="bg-indigo-600 text-white font-bold py-2 px-4 rounded-md hover:bg-indigo-700">Close</button>
+      </div>
+    </div>
+
+
+    <script>
+        // --- Global State & Elements ---
+        const state = {
+            mode: 'single', // 'single', 'bulk', 'verify'
+            presetImage: null,
+            nameRect: null,
+            codeRect: null,
+            drawing: {
+                isDrawing: false,
+                startX: 0,
+                startY: 0,
+                target: null, // 'name' or 'code'
+            },
+            // certificatesDB is now managed by the backend
+        };
+
+        const API_URL = 'http://127.0.0.1:5000/api'; // URL of the Flask backend
+
+        const tabs = {
+            single: document.getElementById('tab-single'),
+            bulk: document.getElementById('tab-bulk'),
+            verify: document.getElementById('tab-verify'),
+        };
+
+        const panels = {
+            single: document.getElementById('panel-single'),
+            bulk: document.getElementById('panel-bulk'),
+            verify: document.getElementById('panel-verify'),
+        };
+        
+        const modal = document.getElementById('message-modal');
+        const modalText = document.getElementById('modal-text');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+
+        // --- Utility Functions ---
+        const generateUniqueCode = (length = 7) => {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+            let result = '';
+            for (let i = 0; i < length; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        };
+
+        const capitalizeWords = (str) => {
+            if (!str) return '';
+            return str.replace(/\b\w/g, char => char.toUpperCase());
+        };
+        
+        const showModal = (message) => {
+            modalText.textContent = message;
+            modal.style.display = 'block';
+        };
+
+        const hideModal = () => {
+            modal.style.display = 'none';
+        };
+
+        const updateButtonState = (panel) => {
+            const btn = document.getElementById(`create-btn-${panel}`);
+            if (!btn) return;
+            
+            const presetInput = document.getElementById(`preset-input-${panel}`);
+            let excelFile = true;
+            if (panel === 'bulk') {
+                excelFile = document.getElementById('excel-input').files.length > 0;
+            }
+
+            if (presetInput.files.length > 0 && excelFile && state.nameRect && state.codeRect) {
+                btn.disabled = false;
+            } else {
+                btn.disabled = true;
+            }
+        };
+        
+        // --- Live Preview ---
+        const updatePreview = () => {
+            if (state.mode !== 'single' || !state.presetImage) return;
+
+            const canvas = document.getElementById('canvas-single');
+            const ctx = canvas.getContext('2d');
+            
+            // Redraw preset image to clear old text
+            ctx.drawImage(state.presetImage, 0, 0);
+
+            const name = capitalizeWords(document.getElementById('name-input').value.trim()) || 'Sample Name';
+            const nameColor = document.getElementById('name-color-input-single').value;
+            const nameFont = document.getElementById('name-font-select-single').value;
+            
+            const code = 'ABC1234'; // Sample code for preview
+            const codeColor = document.getElementById('code-color-input-single').value;
+            const codeFont = document.getElementById('code-font-select-single').value;
+
+            // Draw name preview if area is set
+            if (state.nameRect) {
+                drawTextOnCanvas(ctx, name, state.nameRect, nameColor, nameFont, false);
+            }
+
+            // Draw code preview if area is set
+            if (state.codeRect) {
+                drawTextOnCanvas(ctx, code, state.codeRect, codeColor, codeFont, true);
+            }
+        };
+
+        // --- Canvas Drawing Logic ---
+        function drawTextOnCanvas(ctx, text, rect, color, font, isCode) {
+            ctx.fillStyle = color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            let fontSize = rect.height * (isCode ? 0.7 : 0.8);
+            let fontStyle = isCode ? `italic ${fontSize}px` : `${fontSize}px`;
+            ctx.font = `${fontStyle} "${font}"`;
+
+            // Auto-adjust font size to fit
+            while (ctx.measureText(text).width > rect.width * 0.95) {
+                fontSize--;
+                fontStyle = isCode ? `italic ${fontSize}px` : `${fontSize}px`;
+                ctx.font = `${fontStyle} "${font}"`;
+            }
+            ctx.fillText(text, rect.x + rect.width / 2, rect.y + rect.height / 2);
+        }
+
+        function setupCanvas(canvasId, containerId, onDrawEnd) {
+            const canvas = document.getElementById(canvasId);
+            const container = document.getElementById(containerId);
+            const ctx = canvas.getContext('2d');
+            let drawingRectDiv = null;
+
+            const getMousePos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const scaleX = canvas.width / rect.width;
+                const scaleY = canvas.height / rect.height;
+                
+                let clientX, clientY;
+                if (e.touches) {
+                    clientX = e.touches[0].clientX;
+                    clientY = e.touches[0].clientY;
+                } else {
+                    clientX = e.clientX;
+                    clientY = e.clientY;
+                }
+
+                return {
+                    x: (clientX - rect.left) * scaleX,
+                    y: (clientY - rect.top) * scaleY,
+                };
+            };
+
+            const startDrawing = (e) => {
+                if (!state.drawing.target || !state.presetImage) return;
+                e.preventDefault();
+                state.drawing.isDrawing = true;
+                const pos = getMousePos(e);
+                state.drawing.startX = pos.x;
+                state.drawing.startY = pos.y;
+
+                drawingRectDiv = document.createElement('div');
+                drawingRectDiv.className = 'drawing-rect';
+                container.appendChild(drawingRectDiv);
+            };
+
+            const draw = (e) => {
+                if (!state.drawing.isDrawing) return;
+                e.preventDefault();
+                const pos = getMousePos(e);
+                const width = pos.x - state.drawing.startX;
+                const height = pos.y - state.drawing.startY;
+
+                const rectX = width > 0 ? state.drawing.startX : pos.x;
+                const rectY = height > 0 ? state.drawing.startY : pos.y;
+                
+                const canvasRect = canvas.getBoundingClientRect();
+                drawingRectDiv.style.left = `${(rectX / canvas.width) * canvasRect.width}px`;
+                drawingRectDiv.style.top = `${(rectY / canvas.height) * canvasRect.height}px`;
+                drawingRectDiv.style.width = `${(Math.abs(width) / canvas.width) * canvasRect.width}px`;
+                drawingRectDiv.style.height = `${(Math.abs(height) / canvas.height) * canvasRect.height}px`;
+            };
+
+            const stopDrawing = (e) => {
+                if (!state.drawing.isDrawing) return;
+                e.preventDefault();
+                state.drawing.isDrawing = false;
+                const pos = getMousePos(e);
+                
+                const x = Math.min(state.drawing.startX, pos.x);
+                const y = Math.min(state.drawing.startY, pos.y);
+                const width = Math.abs(pos.x - state.drawing.startX);
+                const height = Math.abs(pos.y - state.drawing.startY);
+
+                if (width > 5 && height > 5) { // Minimum size check
+                    const newRect = { x, y, width, height };
+                    if (state.drawing.target === 'name') {
+                        state.nameRect = newRect;
+                    } else if (state.drawing.target === 'code') {
+                        state.codeRect = newRect;
+                    }
+                    onDrawEnd();
+                }
+                
+                if (drawingRectDiv) {
+                    container.removeChild(drawingRectDiv);
+                    drawingRectDiv = null;
+                }
+                state.drawing.target = null;
+                canvas.style.cursor = 'default';
+            };
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mousemove', draw);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseleave', stopDrawing);
+            
+            canvas.addEventListener('touchstart', startDrawing);
+            canvas.addEventListener('touchmove', draw);
+            canvas.addEventListener('touchend', stopDrawing);
+        }
+
+        // --- Certificate Generation Logic ---
+        async function drawCertificate(name, code, presetImg, nameRect, codeRect, nameColor, codeColor, nameFont, codeFont) {
+            const offscreenCanvas = document.createElement('canvas');
+            const offscreenCtx = offscreenCanvas.getContext('2d');
+            
+            offscreenCanvas.width = presetImg.width;
+            offscreenCanvas.height = presetImg.height;
+
+            // 1. Draw preset
+            offscreenCtx.drawImage(presetImg, 0, 0);
+
+            // 2. Draw Name & Code
+            drawTextOnCanvas(offscreenCtx, name, nameRect, nameColor, nameFont, false);
+            drawTextOnCanvas(offscreenCtx, code, codeRect, codeColor, codeFont, true);
+
+            return offscreenCanvas.toDataURL('image/png');
+        }
+
+        // --- Initial Setup ---
+        const populateFontSelectors = () => {
+            const fonts = [
+                'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Oswald', 'Raleway', 'Playfair Display', 'Merriweather', 'Lobster', 'Inconsolata',
+                'Arial', 'Verdana', 'Helvetica', 'Tahoma', 'Trebuchet MS', 'Times New Roman', 'Georgia', 'Garamond', 'Courier New', 'Brush Script MT'
+            ];
+            const nameSelectors = [document.getElementById('name-font-select-single'), document.getElementById('name-font-select-bulk')];
+            const codeSelectors = [document.getElementById('code-font-select-single'), document.getElementById('code-font-select-bulk')];
+
+            fonts.forEach(font => {
+                const addOption = (selector) => {
+                    const option = new Option(font, font);
+                    option.style.fontFamily = font;
+                    selector.add(option);
+                };
+                nameSelectors.forEach(addOption);
+                codeSelectors.forEach(addOption);
+            });
+            nameSelectors.forEach(s => { s.value = 'Playfair Display'; s.style.fontFamily = 'Playfair Display'; });
+            codeSelectors.forEach(s => { s.value = 'Inconsolata'; s.style.fontFamily = 'Inconsolata'; });
+        };
+
+        document.addEventListener('DOMContentLoaded', populateFontSelectors);
+
+
+        // --- Event Listeners ---
+        
+        modalCloseBtn.addEventListener('click', hideModal);
+        window.addEventListener('click', (event) => {
+            if (event.target == modal) hideModal();
+        });
+
+        Object.keys(tabs).forEach(key => {
+            tabs[key].addEventListener('click', () => {
+                state.mode = key;
+                Object.keys(panels).forEach(panelKey => {
+                    panels[panelKey].classList.toggle('hidden', key !== panelKey);
+                    tabs[panelKey].classList.toggle('tab-active', key === panelKey);
+                });
+                updatePreview();
+            });
+        });
+        
+        const loadPreset = (file, canvasId, containerId) => {
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    state.presetImage = img;
+                    const canvas = document.getElementById(canvasId);
+                    const placeholder = document.querySelector(`#${containerId} .placeholder-text`);
+                    if (placeholder) placeholder.style.display = 'none';
+
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    state.nameRect = null;
+                    state.codeRect = null;
+                    document.getElementById(`rect-info${canvasId.includes('bulk') ? '-bulk' : ''}`).innerHTML = '';
+                    
+                    updateButtonState(state.mode);
+                    updatePreview();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+        
+        document.getElementById('preset-input-single').addEventListener('change', (e) => loadPreset(e.target.files[0], 'canvas-single', 'canvas-container-single'));
+        document.getElementById('preset-input-bulk').addEventListener('change', (e) => loadPreset(e.target.files[0], 'canvas-bulk', 'canvas-container-bulk'));
+        
+        // Listeners for live preview
+        ['name-input', 'name-font-select-single', 'code-font-select-single', 'name-color-input-single', 'code-color-input-single'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updatePreview);
+            if(id.includes('select')) {
+                 document.getElementById(id).addEventListener('change', (e) => {
+                    e.target.style.fontFamily = e.target.value;
+                    updatePreview();
+                 });
+            }
+        });
+
+        document.getElementById('excel-input').addEventListener('change', () => updateButtonState('bulk'));
+
+        const setupRectButtons = (panel) => {
+            const suffix = panel === 'single' ? '' : '-bulk';
+            const nameBtn = document.getElementById(`set-name-rect-btn${suffix}`);
+            const codeBtn = document.getElementById(`set-code-rect-btn${suffix}`);
+            const canvas = document.getElementById(`canvas${suffix}`);
+            
+            const setTarget = (target) => {
+                if (!state.presetImage) {
+                    showModal('Please upload a preset image first.');
+                    return;
+                }
+                state.drawing.target = target;
+                canvas.style.cursor = 'crosshair';
+            };
+            nameBtn.addEventListener('click', () => setTarget('name'));
+            codeBtn.addEventListener('click', () => setTarget('code'));
+        };
+        setupRectButtons('single');
+        setupRectButtons('bulk');
+
+        const onDrawEnd = () => {
+            const suffix = state.mode === 'single' ? '' : '-bulk';
+            const info = document.getElementById(`rect-info${suffix}`);
+            info.innerHTML = `
+                ${state.nameRect ? '<span class="text-sky-600">Name area set.</span>' : ''}
+                ${state.codeRect ? '<span class="text-rose-600 ml-2">Code area set.</span>' : ''}
+            `;
+            updateButtonState(state.mode);
+            updatePreview();
+        };
+        setupCanvas('canvas-single', 'canvas-container-single', onDrawEnd);
+        setupCanvas('canvas-bulk', 'canvas-container-bulk', onDrawEnd);
+
+        // --- Main Action Buttons ---
+
+        // Single Create
+        document.getElementById('create-btn-single').addEventListener('click', async () => {
+            let name = document.getElementById('name-input').value.trim();
+            if (!name) return showModal('Please enter a name.');
+            if (!state.presetImage || !state.nameRect || !state.codeRect) return showModal('Please upload a preset and define both name and code areas.');
+            
+            name = capitalizeWords(name);
+            const nameColor = document.getElementById('name-color-input-single').value;
+            const codeColor = document.getElementById('code-color-input-single').value;
+            const nameFont = document.getElementById('name-font-select-single').value;
+            const codeFont = document.getElementById('code-font-select-single').value;
+            const code = generateUniqueCode();
+            
+            const imageDataUrl = await drawCertificate(name, code, state.presetImage, state.nameRect, state.codeRect, nameColor, codeColor, nameFont, codeFont);
+            
+            try {
+                const response = await fetch(`${API_URL}/certificates`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, code, image_data: imageDataUrl })
+                });
+                if (!response.ok) throw new Error(`Server responded with ${response.status}`);
+                
+                const link = document.createElement('a');
+                link.download = `certificate-${name.replace(/\s+/g, '-')}-${code}.png`;
+                link.href = imageDataUrl;
+                link.click();
+                showModal(`Certificate for ${name} created and saved with code: ${code}`);
+
+            } catch (error) {
+                console.error("Failed to save certificate:", error);
+                showModal("Failed to save certificate to the database. Please ensure the backend server is running. You can still download the image.");
+                 // Allow download even if backend fails
+                const link = document.createElement('a');
+                link.download = `certificate-${name.replace(/\s+/g, '-')}-${code}.png`;
+                link.href = imageDataUrl;
+                link.click();
+            }
+        });
+
+        // Bulk Create
+        document.getElementById('create-btn-bulk').addEventListener('click', () => {
+            const excelFile = document.getElementById('excel-input').files[0];
+            if (!excelFile) return showModal('Please upload an Excel file.');
+            if (!state.presetImage || !state.nameRect || !state.codeRect) return showModal('Please upload a preset and define both name and code areas.');
+            
+            const loader = document.getElementById('bulk-loader');
+            const resultsContainer = document.getElementById('bulk-results-container');
+            const resultsGrid = document.getElementById('bulk-results-grid');
+            
+            loader.classList.remove('hidden');
+            resultsContainer.classList.remove('hidden');
+            resultsGrid.innerHTML = ''; 
+            
+            const nameColor = document.getElementById('name-color-input-bulk').value;
+            const codeColor = document.getElementById('code-color-input-bulk').value;
+            const nameFont = document.getElementById('name-font-select-bulk').value;
+            const codeFont = document.getElementById('code-font-select-bulk').value;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const json = XLSX.utils.sheet_to_json(worksheet);
+
+                    if (!json.length || !json[0].hasOwnProperty('Name')) {
+                        loader.classList.add('hidden');
+                        return showModal("Excel file is empty or missing a 'Name' column.");
+                    }
+                    
+                    let generatedCerts = [];
+
+                    for (const row of json) {
+                        let name = row.Name.toString().trim();
+                        if (!name) continue;
+                        
+                        name = capitalizeWords(name);
+                        const code = generateUniqueCode();
+                        const imageDataUrl = await drawCertificate(name, code, state.presetImage, state.nameRect, state.codeRect, nameColor, codeColor, nameFont, codeFont);
+                        
+                        generatedCerts.push({ name, code, image_data: imageDataUrl });
+
+                        // Display card
+                        const card = document.createElement('div');
+                        card.className = 'bg-white p-2 rounded-lg shadow-sm text-center';
+                        card.innerHTML = `
+                            <img src="${imageDataUrl}" alt="Certificate for ${name}" class="rounded-md mb-2">
+                            <h4 class="font-semibold text-sm">${name}</h4>
+                            <p class="text-xs text-slate-500">${code}</p>
+                            <a href="${imageDataUrl}" download="cert-${name.replace(/\s+/g, '-')}-${code}.png" class="mt-2 inline-block text-indigo-600 hover:underline text-sm">Download PNG</a>
+                        `;
+                        resultsGrid.appendChild(card);
+                    }
+
+                    // Save all to backend
+                    await fetch(`${API_URL}/certificates/bulk`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ certificates: generatedCerts })
+                    });
+
+                    loader.classList.add('hidden');
+                } catch (error) {
+                    console.error("Error during bulk creation:", error);
+                    showModal("An error occurred during bulk creation. Please check the console and ensure the backend is running.");
+                    loader.classList.add('hidden');
+                }
+            };
+            reader.readAsArrayBuffer(excelFile);
+        });
+
+        // Download All as PDF (logic remains client-side for now)
+        document.getElementById('download-all-pdf').addEventListener('click', async () => {
+            const certImages = document.querySelectorAll('#bulk-results-grid img');
+            if (certImages.length === 0) return showModal("No certificates have been generated yet in this view.");
+            
+            const loader = document.getElementById('bulk-loader');
+            loader.classList.remove('hidden');
+
+            const { jsPDF } = window.jspdf;
+            const firstImg = certImages[0];
+            const pdf = new jsPDF({
+                orientation: firstImg.naturalWidth > firstImg.naturalHeight ? 'landscape' : 'portrait',
+                unit: 'px',
+                format: [firstImg.naturalWidth, firstImg.naturalHeight]
+            });
+
+            certImages.forEach((img, index) => {
+                if (index > 0) pdf.addPage();
+                pdf.addImage(img.src, 'PNG', 0, 0, img.naturalWidth, img.naturalHeight);
+            });
+
+            pdf.save('all-certificates.pdf');
+            loader.classList.add('hidden');
+        });
+
+        // Verify Certificate
+        document.getElementById('verify-btn').addEventListener('click', async () => {
+            const code = document.getElementById('verify-code-input').value.trim();
+            const resultDiv = document.getElementById('verify-result');
+            if (!code) return resultDiv.innerHTML = `<p class="text-center text-amber-600">Please enter a code to verify.</p>`;
+
+            try {
+                const response = await fetch(`${API_URL}/certificates/${code}`);
+                if (response.status === 404) {
+                     resultDiv.innerHTML = `
+                        <div class="p-4 bg-red-50 border border-red-200 rounded-lg">
+                            <h3 class="text-lg font-semibold text-red-800 text-center">Certificate Not Found</h3>
+                            <p class="text-center text-slate-600 mt-2">The code <span class="font-mono">${code}</span> is not valid.</p>
+                        </div>`;
+                    return;
+                }
+                if (!response.ok) throw new Error(`Server error: ${response.status}`);
+
+                const cert = await response.json();
+                resultDiv.innerHTML = `
+                    <div class="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <h3 class="text-lg font-semibold text-green-800 text-center mb-2">Certificate Found!</h3>
+                        <p class="text-center text-slate-600 mb-4">Code: <span class="font-mono">${cert.code}</span><br>Recipient: <span class="font-semibold">${cert.name}</span></p>
+                        <img src="${cert.image_data}" alt="Certificate for ${cert.name}" class="rounded-md shadow-md w-full">
+                    </div>
+                `;
+            } catch (error) {
+                console.error("Verification failed:", error);
+                showModal("Verification failed. Could not connect to the backend server.");
+            }
+        });
+
+    </script>
+</body>
+</html>
